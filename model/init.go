@@ -9,19 +9,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-type Database struct {
-	Local *gorm.DB
-}
+var DB *gorm.DB
 
-var DB *Database
-
-func (db *Database) Init() {
-	DB = &Database{
-		Local: openDB(),
-	}
-}
-
-func openDB() *gorm.DB {
+func Init() {
+	var err error
 	config := fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8&parseTime=%t&loc=%s",
 		viper.GetString("db.username"),
 		viper.GetString("db.password"),
@@ -30,17 +21,14 @@ func openDB() *gorm.DB {
 		true,
 		"Local")
 
-	db, err := gorm.Open("mysql", config)
+	DB, err = gorm.Open("mysql", config)
 	if err != nil {
 		log.Errorf(err, "Database connection failed. Database name: %s", viper.GetString("db.username"))
 	}
 
-	db.DB().SetMaxOpenConns(2000)
-	db.DB().SetMaxIdleConns(0)
+	DB.DB().SetMaxOpenConns(2000)
+	DB.DB().SetMaxIdleConns(0)
 
-	return db
-}
+	//defer DB.Close()
 
-func (db *Database) Close() {
-	DB.Local.Close()
 }

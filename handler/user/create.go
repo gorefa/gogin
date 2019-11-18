@@ -1,55 +1,50 @@
 package user
 
 import (
-	"fmt"
-
 	. "gogin/handler"
+	"gogin/model"
 	"gogin/pkg/errno"
+	"gogin/util"
+
+	"github.com/lexkong/log/lager"
 
 	"github.com/lexkong/log"
 
 	"github.com/gin-gonic/gin"
 )
 
-type CreateRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type CreateResponse struct {
-	Username string `json:"username"`
-}
-
 func Create(c *gin.Context) {
-	var req CreateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	log.Info("User Create function called.", lager.Data{"X-Request-Id": util.GetReqID(c)})
+
+	var r CreateRequest
+	if err := c.Bind(&r); err != nil {
 		SendResponse(c, errno.ErrBind, nil)
 		return
 	}
-	fmt.Println("req", req)
-	username := c.Param("username")
-	log.Infof("URL username: %s", username)
 
-	desc := c.Query("desc")
-	log.Infof("URL key param desc: %s", desc)
+	u := model.UserModel{
+		Username: r.Username,
+		Password: r.Password,
+	}
 
-	contentType := c.GetHeader("Content-Type")
-	log.Infof("Header Content-Type: %s", contentType)
-
-	log.Debugf("username is: [%s], password is [%s]", req.Username, req.Password)
-	if req.Username == "" {
-		SendResponse(c, errno.New(errno.ErrUserNotFound, fmt.Errorf("username can not found in db: xx.xx.xx.xx")), nil)
+	if err := u.Validate(); err != nil {
+		SendResponse(c, errno.ErrValidation, nil)
 		return
 	}
 
-	if req.Password == "" {
-		SendResponse(c, fmt.Errorf("password is empty"), nil)
+	if err := u.Encrypt(); err != nil {
+		SendResponse(c, errno.ErrEncrypt, nil)
+		return
+	}
+
+	if err := u.Create(); err != nil {
+		SendResponse(c, errno.ErrDatabase, nil)
+		return
 	}
 
 	rsp := CreateResponse{
-		Username: req.Username,
+		Username: r.Username,
 	}
 
-	// Show the user information.
 	SendResponse(c, nil, rsp)
 }
