@@ -1,17 +1,34 @@
 package model
 
 import (
+	"fmt"
+
 	"github.com/gorefa/log"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metricsv1beta1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
 
+func Monitoring(ns string) {
+
+	RestConfig, err = GetrestConfig("ifeng-sre")
+	c, _ := metricsv1beta1.NewForConfig(RestConfig)
+
+	//ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	podmetris, _ := c.PodMetricses(ns).Get("test", metav1.GetOptions{})
+
+	for _, value := range podmetris.Containers {
+		fmt.Println(value.Usage.Memory())
+		fmt.Println(value.Usage.Cpu())
+	}
+}
+
 type PodStat struct {
-	Name   string
-	Status bool
+	Name         string
+	Status       bool
 	RestartCount int32
-	Message string
+	Message      string
 }
 
 type Ingress struct {
@@ -19,8 +36,8 @@ type Ingress struct {
 	Name string
 }
 
-func PodList(cluster,ns string) []PodStat {
-	Clientset , err = NewInitK8S(cluster)
+func PodList(cluster, ns string) []PodStat {
+	Clientset, err = NewInitK8S(cluster)
 	pods, err := Clientset.CoreV1().Pods(ns).List(metav1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
@@ -28,7 +45,7 @@ func PodList(cluster,ns string) []PodStat {
 
 	podstatus := []PodStat{}
 
-	for i:= 0; i< len(pods.Items);i++ {
+	for i := 0; i < len(pods.Items); i++ {
 		var item PodStat
 		item.Name = pods.Items[i].Name
 		//item.Status = string(pods.Items[i].Status.Phase)
@@ -39,10 +56,9 @@ func PodList(cluster,ns string) []PodStat {
 
 		item.RestartCount = pods.Items[i].Status.ContainerStatuses[0].RestartCount
 		item.Status = pods.Items[i].Status.ContainerStatuses[0].Ready
-		if ! item.Status {
+		if !item.Status {
 			item.Message = pods.Items[i].Status.ContainerStatuses[0].State.Waiting.Reason
 		}
-
 
 		podstatus = append(podstatus, item)
 	}
@@ -56,8 +72,8 @@ func PodList(cluster,ns string) []PodStat {
 	return podstatus
 }
 
-func IngressList(cluster,ns string) []string {
-	Clientset , err = NewInitK8S(cluster)
+func IngressList(cluster, ns string) []string {
+	Clientset, err = NewInitK8S(cluster)
 	ingress, err := Clientset.ExtensionsV1beta1().Ingresses(ns).List(metav1.ListOptions{})
 	if err != nil {
 		log.Fatalf(err, "list %s ingress err", ns)
@@ -70,8 +86,8 @@ func IngressList(cluster,ns string) []string {
 	return ingresses
 }
 
-func DeploymentCreate(cluster,ns string) (string, error) {
-	Clientset , err = NewInitK8S(cluster)
+func DeploymentCreate(cluster, ns string) (string, error) {
+	Clientset, err = NewInitK8S(cluster)
 	deploymentsClient := Clientset.AppsV1().Deployments(ns)
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -121,7 +137,7 @@ func DeploymentCreate(cluster,ns string) (string, error) {
 func int32Ptr(i int32) *int32 { return &i }
 
 func NodeList(cluster string) []string {
-	Clientset , err = NewInitK8S(cluster)
+	Clientset, err = NewInitK8S(cluster)
 	nodelist, err := Clientset.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		log.Fatalf(err, "list node err")

@@ -23,7 +23,7 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 	})
 
 	g.POST("/login", user.Login)
-	g.POST("/cluster",k8s.ClusterCreate)
+	g.POST("/cluster", k8s.ClusterCreate)
 
 	v1 := g.Group("/api/v1/")
 	{
@@ -46,6 +46,11 @@ func Load(g *gin.Engine, mw ...gin.HandlerFunc) *gin.Engine {
 		k.GET("/:ns/ingress", k8s.IngressList)
 		k.POST("/:ns", k8s.DeploymentCreate)
 		k.GET("", k8s.NodeList)
+	}
+
+	m := g.Group("/api/v1/k8s/monitoring")
+	{
+		m.GET("/:ns", k8s.Monitoring)
 	}
 
 	return g

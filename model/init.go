@@ -9,23 +9,24 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gorefa/log"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
-	"github.com/gorefa/log"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
-	err error
-	DB        *gorm.DB
-	Mongo        *mongo.Database
-	Clientset *kubernetes.Clientset
-
+	err        error
+	DB         *gorm.DB
+	Mongo      *mongo.Database
+	Clientset  *kubernetes.Clientset
+	RestConfig *rest.Config
 )
 
 func Init() {
@@ -109,14 +110,40 @@ func homeDir() string {
 	return os.Getenv("USERPROFILE") // windows
 }
 
-
-func NewInitK8S(clustername string) (*kubernetes.Clientset ,error){
+func GetrestConfig(clustername string) (*rest.Config, error) {
 	filter := bson.D{{"name", clustername}}
 	cluster := Cluster{}
 
 	if err := Mongo.Collection(CollectionCluster).FindOne(context.TODO(), filter).Decode(&cluster); err != nil {
 		log.Errorf(err, "get cluster config from DB failed.")
-		return nil,err
+		return nil, err
+	}
+	config, err := base64.StdEncoding.DecodeString(cluster.KubeConfig)
+	if err != nil {
+		log.Errorf(err, "base64 decode failed.cluster: %s ", clustername)
+		return nil, err
+	}
+
+	cliConfig, err := clientcmd.NewClientConfigFromBytes(config)
+	if err != nil {
+		log.Errorf(err, "kube config error.")
+		return nil, err
+	}
+
+	RestConfig, err = cliConfig.ClientConfig()
+	if err != nil {
+		log.Errorf(err, " kube clinet config error.")
+		return nil, err
+	}
+	return RestConfig, nil
+}
+func NewInitK8S(clustername string) (*kubernetes.Clientset, error) {
+	filter := bson.D{{"name", clustername}}
+	cluster := Cluster{}
+
+	if err := Mongo.Collection(CollectionCluster).FindOne(context.TODO(), filter).Decode(&cluster); err != nil {
+		log.Errorf(err, "get cluster config from DB failed.")
+		return nil, err
 	}
 	config, err := base64.StdEncoding.DecodeString(cluster.KubeConfig)
 	if err != nil {
@@ -142,5 +169,5 @@ func NewInitK8S(clustername string) (*kubernetes.Clientset ,error){
 		return nil, err
 	}
 
-	return Clientset,nil
+	return Clientset, nil
 }
